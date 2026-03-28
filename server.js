@@ -1,35 +1,70 @@
 const express = require('express');
 const cors = require('cors');
 const mongodb = require('./db/connect');
+const passport = require('passport');
+const session = require('express-session');
+const GitHubStrategy = require('passport-github2').Strategy;
 
 const port = process.env.PORT || 8080;
 const app = express();
 
 app
-  .use(cors())
   .use(express.json())
+  .use(session({
+    secret: process.env.SESSION_SECRET || 'secret',
+    resave: false,
+    saveUninitialized: true,
+  }))
+  .use(passport.initialize())
+  .use(passport.session())
+  .use(cors({ methods: ['GET', 'POST', 'DELETE', 'UPDATE', 'PUT', 'PATCH'] }))
+  .use(cors({ origin: '*' }))
   .use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Z-Key');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     next();
   })
-  .use('/', require('./routes'))
-  .use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
+  .use('/', require('./routes'));
+
+passport.use(new GitHubStrategy({
+  clientID: process.env.GITHUB_CLIENT_ID,
+  clientSecret: process.env.GITHUB_CLIENT_SECRET,
+  callbackURL: process.env.CALLBACK_URL
+},
+  function (accessToken, refreshToken, profile, done) {
+    return done(null, profile);
+  }
+));
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+app.get('/', (req, res) => {
+  res.send(req.session.user !== undefined ? `Logged in as ${req.session.user.displayName}` : "Logged out");
+});
+
+app.get('/auth-callback', passport.authenticate('github', {
+  failureRedirect: '/api-docs', session: false
+}),
+  (req, res) => {
+    req.session.user = req.user;
+    res.redirect('/');
   });
 
-if (!process.env.MONGODB_URI) {
-  console.error('Error: MONGODB_URI is not defined in the .env file.');
-  process.exit(1);
-}
-
-mongodb.initDb((err) => { // Renamed 'mongodb' parameter to avoid shadowing the module
+mongodb.initDb((err) => {
   if (err) {
-    console.error('Failed to connect to the database:', err); // More descriptive error message
-    process.exit(1); // Exit the process if DB connection fails
+    console.error('Failed to connect to the database:', err);
+    process.exit(1);
   } else {
-    app.listen(port, () => { // Added callback for app.listen
+    app.listen(port, () => {
       console.log(`Connected to DB and listening on ${port}`);
     });
   }
 });
+
