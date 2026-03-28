@@ -4,9 +4,19 @@ const mongodb = require('./db/connect');
 const passport = require('passport');
 const session = require('express-session');
 const GitHubStrategy = require('passport-github2').Strategy;
+const MongoDBStore = require('connect-mongodb-session')(session);
 
 const port = process.env.PORT || 8080;
 const app = express();
+
+const store = new MongoDBStore({
+  uri: process.env.MONGODB_URI,
+  collection: 'sessions'
+});
+
+store.on('error', function (error) {
+  console.log(error);
+});
 
 app
   .use(express.json())
@@ -14,7 +24,9 @@ app
     secret: process.env.SESSION_SECRET || 'secret',
     resave: false,
     saveUninitialized: true,
+    store: store
   }))
+
   .use(passport.initialize())
   .use(passport.session())
   .use(cors({ methods: ['GET', 'POST', 'DELETE', 'UPDATE', 'PUT', 'PATCH'] }))
