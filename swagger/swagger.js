@@ -5,8 +5,8 @@ const doc = {
     title: 'Art Gallery API',
     description: 'Art Gallery Management API',
   },
-  host: 'localhost:8080',
-  schemes: ['http', 'https'],
+  host: 'cse-341-project2-iw9e.onrender.com',
+  schemes: ['https', 'http'],
   securityDefinitions: {
     github_auth: {
       type: 'oauth2',
